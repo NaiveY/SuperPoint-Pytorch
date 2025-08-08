@@ -4,7 +4,9 @@ import cv2
 from math import pi
 from numpy.random import uniform
 from scipy.stats import truncnorm
+from scipy import stats
 import kornia
+from kornia.geometry.transform import warp_perspective
 from utils.params import dict_update
 from utils.tensor_op import erosion2d
 from utils.keypoint_op import *
@@ -26,7 +28,8 @@ def homographic_aug_pipline(img, pts, config, device='cpu'):
     homography = sample_homography(image_shape, config['params'], device=device)
     ##
     #warped_image = cv2.warpPerspective(img, homography, tuple(image_shape[::-1]))
-    warped_image = kornia.warp_perspective(img, homography, image_shape, align_corners=True)
+    # warped_image = kornia.warp_perspective(img, homography, image_shape, align_corners=True)
+    warped_image = warp_perspective(img, homography, image_shape, align_corners=True)
 
     warped_valid_mask = compute_valid_mask(image_shape, homography, config['valid_border_margin'], device=device)
 
@@ -63,7 +66,8 @@ def compute_valid_mask(image_shape, homographies, erosion_radius=0, device='cpu'
     # homographies = torch.linalg.inv(homographies)
     B = homographies.shape[0]
     img_one = torch.ones(tuple([B,1,*image_shape]),device=device, dtype=torch.float32)#B,C,H,W
-    mask = kornia.warp_perspective(img_one, homographies, tuple(image_shape), align_corners=True)
+    # mask = kornia.warp_perspective(img_one, homographies, tuple(image_shape), align_corners=True)
+    mask = warp_perspective(img_one, homographies, tuple(image_shape), align_corners=True)
     mask = mask.round()#B1HW
     #mask = cv2.warpPerspective(np.ones(image_shape), homography, dsize=tuple(image_shape[::-1]))#dsize=tuple([w,h])
     if erosion_radius > 0:
@@ -122,10 +126,10 @@ def sample_homography(shape, config=None, device='cpu'):
     # Random scaling
     # sample several scales, check collision with borders, randomly pick a valid one
     if config['scaling']:
-        mu, sigma = 1, _config['scaling_amplitude']/2
+        mu, sigma = 1, config['scaling_amplitude']/2
         lower, upper = mu - 2 * sigma, mu + 2 * sigma
         tnorm_s = stats.truncnorm((lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma)
-        scales = tnorm_s.rvs(_config['n_scales'])
+        scales = tnorm_s.rvs(config['n_scales'])
         #scales = np.random.uniform(0.8, 2, config['n_scales'])
         scales = np.concatenate((np.array([1]), scales), axis=0)
 
